@@ -1,4 +1,6 @@
 #include <ncurses.h>
+#define SNAKE_SYM 'o'
+#define FIELD_SYM '#'
 
 struct snake_struct
 {
@@ -6,15 +8,34 @@ struct snake_struct
     int direction; //1 - up, 2 - right, 3 - down, 4 - left
 };
 
-struct snake_struct snake;
-int row, col, game_end;
-const char SNAKE_SYM = 'o';
+struct field_struct
+{
+    int x, y; //coordinates of up left corner of field
+    int w, h; // width and height of field
+};
 
+struct snake_struct snake;
+struct field_struct field;
+int row, col, game_end;
+//const char SNAKE_SYM = 'o';
+
+void swap(int *a, int *b);
 void welcome_screen(int row, int col);
 int get_key_pressed();
 void on_key_pressed(int *key_pressed);
-void move_snake();
+void init_field();
+void init_snake();
+void draw_field();
 void draw_snake();
+void move_snake();
+
+void swap(int *a, int *b)
+{
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
+    return;
+}
 
 void welcome_screen(int row, int col)
 {
@@ -54,6 +75,50 @@ void on_key_pressed(int *key_pressed)
     return;
 }
 
+void init_field()
+{
+    field.w = 50;
+    field.h = 25;
+    field.x = (col - field.w) / 2;
+    field.y = (row - field.h) / 2;
+    return;
+}
+
+void init_snake()
+{
+    snake.hx = 0;
+    snake.hy = row / 2;
+    snake.direction = 2;
+    return;
+}
+
+void draw_field()
+{
+    int i;
+    move(field.y, field.x);
+    for (i = field.x; i < field.x + field.w; ++i)
+    {
+        move(field.y, i);
+        addch(FIELD_SYM);
+    }
+    for (i = field.y; i < field.y + field.h; ++i)
+    {
+        move(i, field.x);
+        addch(FIELD_SYM);
+    }
+    for (i = field.x; i < field.x + field.w; ++i)
+    {
+        move(field.y + field.h - 1, i);
+        addch(FIELD_SYM);
+    }
+    for (i = field.y; i < field.y + field.h; ++i)
+    {
+        move(i, field.x + field.w - 1);
+        addch(FIELD_SYM);
+    }
+    return;
+}
+
 void draw_snake()
 {
     move(snake.hy, snake.hx);
@@ -84,11 +149,12 @@ int main()
 
     clear();
     refresh();
-    halfdelay(1);
 
-    snake.hx = 0;
-    snake.hy = row / 2;
-    snake.direction = 2;
+    init_snake();
+    init_field();
+    draw_field();
+    getch();
+    halfdelay(1);
     game_end = 0;
 
     while (!game_end)
