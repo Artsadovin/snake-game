@@ -1,7 +1,9 @@
 #include <ncurses.h>
 #include <stdlib.h>
+#include <time.h>
 #define SNAKE_SYM "o"
 #define FIELD_SYM '#'
+#define APPLE_SYM '+'
 
 struct node
 {
@@ -15,12 +17,18 @@ struct field_struct
     int w, h; // width and height of field
 };
 
+struct apple_struct
+{
+    int x, y;
+};
+
 struct game_state
 {
     struct node* head;
     int grow;
     int direction;
     int game_end;
+    struct apple_struct apple;
 };
 
 struct field_struct field;
@@ -35,6 +43,8 @@ void draw_field();
 void draw_snake(struct game_state* state);
 void move_snake(struct game_state* state);
 int is_bump(struct node** head, int new_x, int new_y);
+void calc_apple(struct apple_struct* apple);
+void draw_apple(struct apple_struct* apple);
 
 void welcome_screen(int row, int col)
 {
@@ -148,6 +158,12 @@ void move_snake(struct game_state* state)
     new_head->next = (*state).head;
     (*state).head = new_head;
 
+    if (new_x == (*state).apple.x && new_y == (*state).apple.y)
+    {
+        calc_apple(&((*state).apple));
+        (*state).grow = 1;
+    }
+
     //delete tail (last element) if necessary
     if (!(*state).grow)
     {
@@ -157,6 +173,7 @@ void move_snake(struct game_state* state)
         free(tmp->next);
         tmp->next = NULL;
     }
+    (*state).grow = 0;
     return;
 }
 
@@ -177,11 +194,27 @@ int is_bump(struct node** head, int new_x, int new_y)
     return 0;
 }
 
+void calc_apple(struct apple_struct* apple)
+{
+    (*apple).x = field.x + 1 + (rand() % (field.w - 1)); 
+    (*apple).y = field.y + 1 + (rand() % (field.h - 1));
+    return;
+}
+
+void draw_apple(struct apple_struct* apple)
+{
+    move((*apple).y, (*apple).x);
+    addch(APPLE_SYM);
+    return;
+}
+
 int main()
 {
     int key_pressed;
+    srand(time(NULL)); 
     initscr();
     noecho();
+    curs_set(0);
     getmaxyx(stdscr, row, col);
     welcome_screen(row, col);
     clear();
@@ -194,12 +227,12 @@ int main()
     state.grow = 0;
     init_field();
     draw_field();
-
+    calc_apple(&(state.apple));
     while (!state.game_end)
     {
         clear();
         draw_field();
-        state.grow = 0;
+        draw_apple(&(state.apple));
         draw_snake(&state);
 
         key_pressed = get_key_pressed();
@@ -211,6 +244,13 @@ int main()
         
         refresh();
     }    
+    clear();
+    move(row / 2, col / 2 - 5);
+    printw("You have lost!");
+    move(row / 2 + 1, col / 2 - 11);
+    printw("Press any key to continue..");
+    refresh();
+    halfdelay(50);
     getch();
     endwin();
 }
