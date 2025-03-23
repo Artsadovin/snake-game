@@ -1,11 +1,12 @@
 #include <ncurses.h>
-#define SNAKE_SYM 'o'
+#include <stdlib.h>
+#define SNAKE_SYM "o"
 #define FIELD_SYM '#'
 
-struct snake_struct
+struct node
 {
-    int hx, hy; //h - head
-    int direction; //1 - up, 2 - right, 3 - down, 4 - left
+    int x, y;
+    struct node *next; //pointer to the next part of snake
 };
 
 struct field_struct
@@ -14,28 +15,25 @@ struct field_struct
     int w, h; // width and height of field
 };
 
-struct snake_struct snake;
+struct game_state
+{
+    struct node* head;
+    int grow;
+    int direction;
+    int game_end;
+};
+
 struct field_struct field;
 int row, col, game_end;
-//const char SNAKE_SYM = 'o';
 
-void swap(int *a, int *b);
 void welcome_screen(int row, int col);
 int get_key_pressed();
-void on_key_pressed(int *key_pressed);
+void on_key_pressed(int* key_pressed, struct game_state* state);
 void init_field();
-void init_snake();
+struct node* create_node(int x, int y);
 void draw_field();
-void draw_snake();
-void move_snake();
-
-void swap(int *a, int *b)
-{
-    int tmp = *a;
-    *a = *b;
-    *b = tmp;
-    return;
-}
+void draw_snake(struct game_state* state);
+void move_snake(struct node** head, int direction, int grow);
 
 void welcome_screen(int row, int col)
 {
@@ -56,21 +54,18 @@ int get_key_pressed()
     return ch;
 }
 
-void on_key_pressed(int *key_pressed)
+void on_key_pressed(int* key_pressed, struct game_state* state)
 {
     if (*key_pressed == 27)
     {
-        game_end = 1;
+        (*state).game_end = 1;
         return;
     }
-    if (*key_pressed == 'w')
-        if (snake.direction != 3) snake.direction = 1;
-    if (*key_pressed == 'a')
-        if (snake.direction != 2) snake.direction = 4;
-    if (*key_pressed == 's')
-        if (snake.direction != 1) snake.direction = 3;
-    if (*key_pressed == 'd')
-        if (snake.direction != 4) snake.direction = 2;
+    if (*key_pressed == 'w' && (*state).direction != 3) (*state).direction = 1;
+    if (*key_pressed == 'a' && (*state).direction != 2) (*state).direction = 4;
+    if (*key_pressed == 's' && (*state).direction != 1) (*state).direction = 3;
+    if (*key_pressed == 'd' && (*state).direction != 4) (*state).direction = 2;
+    if (*key_pressed == 'n') (*state).grow = 1;
     *key_pressed = 0;
     return;
 }
@@ -84,12 +79,13 @@ void init_field()
     return;
 }
 
-void init_snake()
+struct node* create_node(int x, int y)
 {
-    snake.hx = 0;
-    snake.hy = row / 2;
-    snake.direction = 2;
-    return;
+    struct node* new_node = (struct node*)malloc(sizeof(struct node));
+    new_node->x = x;
+    new_node->y = y;
+    new_node->next = NULL;
+    return new_node;
 }
 
 void draw_field()
@@ -119,21 +115,40 @@ void draw_field()
     return;
 }
 
-void draw_snake()
+void draw_snake(struct game_state* state)
 {
-    move(snake.hy, snake.hx);
-    addch(SNAKE_SYM);
+    struct node* current = state->head;
+    while (current != NULL)
+    {
+        mvprintw(current->y, current->x, SNAKE_SYM);
+        current = current->next;
+    }
     return;
 }
 
-void move_snake()
+void move_snake(struct node** head, int direction, int grow)
 {
-    move(snake.hy, snake.hx);
-    addch(' ');
-    if (snake.direction == 1) --snake.hy;
-    else if (snake.direction == 2) ++snake.hx;
-    else if (snake.direction == 3) ++snake.hy;
-    else if (snake.direction == 4) --snake.hx;
+    int new_x = (*head)->x;
+    int new_y = (*head)->y;
+    if (direction == 1) --new_y;
+    else if (direction == 2) ++new_x;
+    else if (direction == 3) ++new_y;
+    else if (direction == 4) --new_x;
+
+    //redefine snake head
+    struct node* new_head = create_node(new_x, new_y);
+    new_head->next = *head;
+    *head = new_head;
+
+    //delete tail (last element) if necessary
+    if (!grow)
+    {
+        struct node* tmp = *head;
+        while (tmp->next->next != NULL)
+            tmp = tmp->next;
+        free(tmp->next);
+        tmp->next = NULL;
+    }
     return;
 }
 
@@ -142,34 +157,35 @@ int main()
     int key_pressed;
     initscr();
     noecho();
-    
     getmaxyx(stdscr, row, col);
-
     welcome_screen(row, col);
-
     clear();
     refresh();
 
-    init_snake();
+    halfdelay(1);
+    struct game_state state;
+    state.head = create_node(0, row / 2);
+    state.direction = 2;
+    state.grow = 0;
     init_field();
     draw_field();
-    getch();
-    halfdelay(1);
-    game_end = 0;
 
-    while (!game_end)
+    while (!state.game_end)
     {
-        draw_snake();
+        clear();
+        //draw_field();
+        state.grow = 0;
+        draw_snake(&state);
 
         key_pressed = get_key_pressed();
         if (key_pressed)
         {
-            on_key_pressed(&key_pressed);
+            on_key_pressed(&key_pressed, &state);
         }
-        move_snake();
+        move_snake(&(state.head), state.direction, state.grow);
+        
         refresh();
-    }
-    
+    }    
     getch();
     endwin();
 }
