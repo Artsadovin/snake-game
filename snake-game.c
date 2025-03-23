@@ -33,7 +33,8 @@ void init_field();
 struct node* create_node(int x, int y);
 void draw_field();
 void draw_snake(struct game_state* state);
-void move_snake(struct node** head, int direction, int grow);
+void move_snake(struct game_state* state);
+int is_bump(struct node** head, int new_x, int new_y);
 
 void welcome_screen(int row, int col)
 {
@@ -126,30 +127,54 @@ void draw_snake(struct game_state* state)
     return;
 }
 
-void move_snake(struct node** head, int direction, int grow)
+void move_snake(struct game_state* state)
 {
-    int new_x = (*head)->x;
-    int new_y = (*head)->y;
-    if (direction == 1) --new_y;
-    else if (direction == 2) ++new_x;
-    else if (direction == 3) ++new_y;
-    else if (direction == 4) --new_x;
+    int new_x = (*state).head->x;
+    int new_y = (*state).head->y;
+    if ((*state).direction == 1) --new_y;
+    else if ((*state).direction == 2) ++new_x;
+    else if ((*state).direction == 3) ++new_y;
+    else if ((*state).direction == 4) --new_x;
+
+    //check for bump with wall or snake itself
+    if (is_bump(&((*state).head), new_x, new_y)) 
+    {
+        (*state).game_end = 1;
+        return;
+    }
 
     //redefine snake head
     struct node* new_head = create_node(new_x, new_y);
-    new_head->next = *head;
-    *head = new_head;
+    new_head->next = (*state).head;
+    (*state).head = new_head;
 
     //delete tail (last element) if necessary
-    if (!grow)
+    if (!(*state).grow)
     {
-        struct node* tmp = *head;
+        struct node* tmp = (*state).head;
         while (tmp->next->next != NULL)
             tmp = tmp->next;
         free(tmp->next);
         tmp->next = NULL;
     }
     return;
+}
+
+int is_bump(struct node** head, int new_x, int new_y)
+{
+    if ((new_x >= field.x + field.w - 1 || new_x <= field.x) || (new_y >= field.y + field.h - 1 || new_y <= field.y))
+        return 1;
+    else
+    {
+        struct node* current = (*head);
+        while (current->next != NULL)
+        {
+            if (current->x == new_x && current->y == new_y)
+                return 1;
+            current = current->next;
+        }
+    }
+    return 0;
 }
 
 int main()
@@ -164,7 +189,7 @@ int main()
 
     halfdelay(1);
     struct game_state state;
-    state.head = create_node(0, row / 2);
+    state.head = create_node(col / 2 + 2, row / 2);
     state.direction = 2;
     state.grow = 0;
     init_field();
@@ -173,7 +198,7 @@ int main()
     while (!state.game_end)
     {
         clear();
-        //draw_field();
+        draw_field();
         state.grow = 0;
         draw_snake(&state);
 
@@ -182,7 +207,7 @@ int main()
         {
             on_key_pressed(&key_pressed, &state);
         }
-        move_snake(&(state.head), state.direction, state.grow);
+        move_snake(&state);
         
         refresh();
     }    
